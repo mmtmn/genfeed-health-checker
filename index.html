@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>genFEED Health Monitor</title>
+
+  <style>
+    :root {
+      --bg: #09090b;
+      --card: #18181b;
+      --card2: #27272a;
+      --text: #f4f4f5;
+      --muted: #a1a1aa;
+      --good: #22c55e;
+      --bad: #ef4444;
+      --warn: #f59e0b;
+      --border: #3f3f46;
+      --button: #e4e4e7;
+      --button-text: #09090b;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      min-height: 100%;
+      background: var(--bg);
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      min-height: calc(100vh - 48px);
+    }
+
+    h1 {
+      margin-bottom: 4px;
+      font-size: 28px;
+    }
+
+    code.brand {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      background: rgba(244, 244, 245, 0.08);
+      color: var(--text);
+      padding: 3px 7px;
+      border-radius: 7px;
+      font-size: 0.95em;
+      border: 1px solid var(--border);
+    }
+
+    .subtitle {
+      color: var(--muted);
+      margin-bottom: 24px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+    }
+
+    .label {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+
+    .value {
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    .online {
+      background: rgba(34, 197, 94, 0.12);
+      color: var(--good);
+    }
+
+    .offline {
+      background: rgba(239, 68, 68, 0.12);
+      color: var(--bad);
+    }
+
+    .checking {
+      background: rgba(245, 158, 11, 0.12);
+      color: var(--warn);
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background: currentColor;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 11px 14px;
+      cursor: pointer;
+      font-weight: bold;
+      background: var(--button);
+      color: var(--button-text);
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    button.danger {
+      background: #7f1d1d;
+      color: white;
+      border: 1px solid #991b1b;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--card);
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    th,
+    td {
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      font-size: 14px;
+    }
+
+    th {
+      background: var(--card2);
+      color: var(--muted);
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .ok {
+      color: var(--good);
+      font-weight: bold;
+    }
+
+    .fail {
+      color: var(--bad);
+      font-weight: bold;
+    }
+
+    .small {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1><code class="brand">genFEED</code> Health Monitor</h1>
+
+    <div class="subtitle">
+      Checking <strong>https://genfeed.co</strong> every 15 minutes.
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="label">Current Status</div>
+        <div id="status" class="status-pill checking">
+          <span class="dot"></span>
+          Waiting
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="label">Last Response Time</div>
+        <div id="responseTime" class="value">—</div>
+      </div>
+
+      <div class="card">
+        <div class="label">Last Check</div>
+        <div id="lastCheck" class="value">—</div>
+      </div>
+
+      <div class="card">
+        <div class="label">Next Check</div>
+        <div id="nextCheck" class="value">—</div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button onclick="runCheck()">Check Now</button>
+      <button class="danger" onclick="clearHistory()">Clear History</button>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Status</th>
+          <th>Request Time</th>
+        </tr>
+      </thead>
+      <tbody id="historyBody"></tbody>
+    </table>
+  </div>
+
+  <script>
+    const TARGET_URL = "https://genfeed.co";
+    const CHECK_INTERVAL_MS = 15 * 60 * 1000;
+    const REQUEST_TIMEOUT_MS = 15000;
+    const STORAGE_KEY = "genfeed_health_history_v4";
+
+    let nextCheckAt = null;
+
+    const statusEl = document.getElementById("status");
+    const responseTimeEl = document.getElementById("responseTime");
+    const lastCheckEl = document.getElementById("lastCheck");
+    const nextCheckEl = document.getElementById("nextCheck");
+    const historyBodyEl = document.getElementById("historyBody");
+
+    function getHistory() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveHistory(history) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(history.slice(0, 1000)));
+    }
+
+    function formatDate(date) {
+      return new Intl.DateTimeFormat(undefined, {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
+      }).format(date);
+    }
+
+    function setStatus(type, text) {
+      statusEl.className = "status-pill " + type;
+      statusEl.innerHTML = `<span class="dot"></span>${text}`;
+    }
+
+    async function fetchWithTimeout(url, options) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+      const startedAt = performance.now();
+
+      try {
+        const response = await fetch(url, {
+          ...options,
+          signal: controller.signal,
+          cache: "no-store"
+        });
+
+        const durationMs = Math.round(performance.now() - startedAt);
+        clearTimeout(timeoutId);
+
+        return { response, durationMs };
+      } catch (error) {
+        const durationMs = Math.round(performance.now() - startedAt);
+        clearTimeout(timeoutId);
+
+        throw { originalError: error, durationMs };
+      }
+    }
+
+    async function runCheck() {
+      setStatus("checking", "Checking...");
+      responseTimeEl.textContent = "—";
+
+      const checkedAt = new Date();
+      const cacheBustedUrl = TARGET_URL + "?healthcheck_ts=" + Date.now();
+
+      let result;
+
+      try {
+        const { response, durationMs } = await fetchWithTimeout(cacheBustedUrl, {
+          method: "GET",
+          mode: "cors"
+        });
+
+        result = {
+          timestamp: checkedAt.toISOString(),
+          displayTime: formatDate(checkedAt),
+          online: response.ok,
+          durationMs
+        };
+      } catch {
+        try {
+          const { durationMs } = await fetchWithTimeout(cacheBustedUrl, {
+            method: "GET",
+            mode: "no-cors"
+          });
+
+          result = {
+            timestamp: checkedAt.toISOString(),
+            displayTime: formatDate(checkedAt),
+            online: true,
+            durationMs
+          };
+        } catch (networkError) {
+          result = {
+            timestamp: checkedAt.toISOString(),
+            displayTime: formatDate(checkedAt),
+            online: false,
+            durationMs: networkError.durationMs || null
+          };
+        }
+      }
+
+      const history = getHistory();
+      history.unshift(result);
+      saveHistory(history);
+
+      updateDashboard(result);
+      renderHistory();
+      scheduleNextCheck();
+    }
+
+    function updateDashboard(result) {
+      if (!result) return;
+
+      if (result.online) {
+        setStatus("online", "Online");
+      } else {
+        setStatus("offline", "Offline");
+      }
+
+      responseTimeEl.textContent = result.durationMs ? result.durationMs + " ms" : "—";
+      lastCheckEl.textContent = result.displayTime;
+    }
+
+    function renderHistory() {
+      const history = getHistory();
+      historyBodyEl.innerHTML = "";
+
+      if (history.length === 0) {
+        historyBodyEl.innerHTML = `
+          <tr>
+            <td colspan="3" class="small">No checks yet.</td>
+          </tr>
+        `;
+        return;
+      }
+
+      for (const item of history) {
+        const tr = document.createElement("tr");
+
+        const statusClass = item.online ? "ok" : "fail";
+        const statusText = item.online ? "Online" : "Offline";
+
+        tr.innerHTML = `
+          <td>${escapeHtml(item.displayTime || item.timestamp)}</td>
+          <td class="${statusClass}">${statusText}</td>
+          <td>${item.durationMs ? escapeHtml(String(item.durationMs)) + " ms" : "—"}</td>
+        `;
+
+        historyBodyEl.appendChild(tr);
+      }
+    }
+
+    function scheduleNextCheck() {
+      nextCheckAt = Date.now() + CHECK_INTERVAL_MS;
+      updateCountdown();
+    }
+
+    function updateCountdown() {
+      if (!nextCheckAt) {
+        nextCheckEl.textContent = "—";
+        return;
+      }
+
+      const remainingMs = Math.max(0, nextCheckAt - Date.now());
+      const minutes = Math.floor(remainingMs / 60000);
+      const seconds = Math.floor((remainingMs % 60000) / 1000);
+
+      nextCheckEl.textContent = `${minutes}m ${String(seconds).padStart(2, "0")}s`;
+    }
+
+    function clearHistory() {
+      const confirmed = confirm("Clear all saved health check history from this browser?");
+
+      if (!confirmed) return;
+
+      localStorage.removeItem(STORAGE_KEY);
+      renderHistory();
+
+      setStatus("checking", "Waiting");
+      responseTimeEl.textContent = "—";
+      lastCheckEl.textContent = "—";
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function boot() {
+      renderHistory();
+
+      const history = getHistory();
+
+      if (history.length > 0) {
+        updateDashboard(history[0]);
+      }
+
+      runCheck();
+
+      setInterval(runCheck, CHECK_INTERVAL_MS);
+      setInterval(updateCountdown, 1000);
+    }
+
+    boot();
+  </script>
+</body>
+</html>
